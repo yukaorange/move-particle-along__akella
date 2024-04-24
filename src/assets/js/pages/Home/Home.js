@@ -1,21 +1,21 @@
-import Page from "@js/class/Page";
+import Page from '@js/class/Page'
 
 export default class Home extends Page {
   constructor() {
     super({
-      id: "home",
-      element: ".home",
+      id: 'home',
+      element: '.home',
       elements: {
-        link: ".home__link",
-      },
-    });
+        link: '.home__link'
+      }
+    })
   }
 
   create() {
-    super.create();
+    super.create()
   }
 
   destroy() {
-    super.destroy();
+    super.destroy()
   }
 }

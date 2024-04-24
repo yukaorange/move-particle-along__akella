@@ -16,6 +16,7 @@
     "vite": "^4.4.5"
   },
   "dependencies": {
+    "@barba/core": "^2.9.7",
     "autoprefixer": "^10.4.15",
     "directory-crawler": "^0.0.6",
     "events": "^3.3.0",

@@ -98,6 +98,10 @@ export default class Preloader extends Component {
       })
     })
 
+    this.assets.svg = [...document.querySelectorAll('.cls-1')]
+
+    console.log(this.assets.svg);
+
     Promise.all([modelPromise, ...imagePromises, envPromise]).then(() => {
       this.onLoaded()
     })
@@ -115,9 +119,17 @@ export default class Preloader extends Component {
     return new Promise(resolve => {
       this.emit('completed')
 
-      this.destroy()
+      this.hide()
 
       resolve()
+    })
+  }
+
+  hide() {
+    GSAP.to(this.element, {
+      autoAlpha: 0,
+      duration: 1.5,
+      ease: 'expo.out'
     })
   }
 

@@ -1,9 +1,11 @@
 import each from 'lodash/each'
 import normalizeWheel from 'normalize-wheel'
+import Barba from '@barba/core'
 
 import BreakpointsObserver from '@js/class/BreakpointsObserver'
 import Assets from '@js/class/Assets'
 import viewPortSetter from '@js/class/SetViewport'
+import MetaManager from '@js//class/MetaManager'
 
 import Canvas from '@js/webgl'
 
@@ -30,9 +32,9 @@ class App {
 
     this.createPages()
 
-    this.addEventListeners()
+    this.initBarba()
 
-    this.addLinkListeners()
+    this.addEventListeners()
 
     this.update()
 
@@ -83,12 +85,14 @@ class App {
   /**
    * app starts to create  webgl experience and show page.
    */
-  onPreloaded() {
+  async onPreloaded() {
     this.onResize()
 
     this.canvas.onPreloaded()
 
-    this.page.show()
+    await this.page.show()
+
+    this.preloader?.destroy()
   }
 
   createNavigation() {
@@ -160,14 +164,14 @@ class App {
 
       const widthDifference = Math.abs(this.currentWidth - newWidth)
 
-      if (widthDifference <= 1) {
+      if (widthDifference <= 0.1) {
         this.resizeFlag = false
       } else {
         this.resizeFlag = true
       }
 
       this.currentWidth = newWidth
-    }, 100)
+    }, 10)
 
     if (this.canvas && this.canvas.onResize && this.resizeFlag === true) {
       this.canvas.onResize(this.device)
@@ -224,96 +228,64 @@ class App {
   /**
    * page transition
    */
-  onPopState() {
-    this.onChange({
-      url: window.location.pathname,
-      push: false
+  initBarba() {
+    Barba.init({
+      transitions: [
+        {
+          name: 'default-transition',
+          once: () => {
+            this.trackPageView(location.pathname)
+          },
+          leave: async () => {
+            await this.page.hide()
+
+            this.canvas.onChangeStart(this.template)
+          },
+          enter: async data => {
+            /**
+             * 下記の不備を検知すると、遷移前のページにリダイレクトされます。
+             * ・遷移先のページを用意していない。
+             * ・遷移先が同じページの場合。
+             * ・遷移先のページでJavaScriptエラーが発生した場合。
+             * */
+
+            const parser = new DOMParser()
+
+            const doc = parser.parseFromString(data.next.html, 'text/html')
+
+            const metaManager = new MetaManager(doc)
+
+            this.template = data.next.container.getAttribute('data-template')
+
+            this.canvas.onChangeEnd(this.template)
+
+            this.page = this.pages[this.template]
+
+            this.page.create()
+
+            metaManager.updateMetaTags()
+
+            await this.page.show()
+
+            this.trackPageView(location.pathname)
+          }
+        }
+      ],
+      views: [],
+      prefetch: true
     })
   }
 
-  async onChange({ url, push = true }) {
-    if (this.onChanging) {
-      return
-    }
-
-    this.onChanging = true
-
-    this.canvas.onChangeStart(this.template)
-
-    await this.page.hide()
-
-    const request = await window.fetch(url)
-
-    if (request.status === 200) {
-      const html = await request.text()
-
-      const perser = new DOMParser()
-
-      const doc = perser.parseFromString(html, 'text/html')
-
-      const title = doc.querySelector('title').innerText
-
-      if (title) {
-        document.title = title
-      }
-
-      const metaDescription = doc.querySelector('meta[name="description"]')
-
-      this.updateMetaDescription(metaDescription)
-
-      const div = document.createElement('div')
-
-      if (push) {
-        window.history.pushState({}, '', url)
-      }
-
-      div.innerHTML = html
-
-      const divContent = div.querySelector('.content')
-
-      this.template = divContent.getAttribute('data-template')
-
-      this.content.setAttribute('data-template', this.template)
-
-      // this.navigation.onChange(this.template)
-
-      this.content.innerHTML = divContent.innerHTML
-
-      this.canvas.onChangeEnd(this.template)
-
-      this.page = this.pages[this.template]
-
-      this.page.create()
-
-      this.onResize()
-
-      this.page.show()
-
-      this.addLinkListeners()
-
-      this.onChanging = false
+  /**
+   * Google Analytics
+   */
+  trackPageView(url) {
+    if (typeof gtag === 'function') {
+      gtag('config', 'YOUR_GA_TRACKING_ID', { page_path: url })
+    } else if (typeof ga === 'function') {
+      ga('send', 'pageview', url)
     } else {
-      console.log('error')
-
-      this.onChanging = false
-    }
-  }
-
-  updateMetaDescription(metaDescriptionContent) {
-    let currentMetaDescription = document.querySelector(
-      'meta[name="description"]'
-    )
-
-    if (currentMetaDescription) {
-      currentMetaDescription.setAttribute('content', metaDescriptionContent)
-    } else {
-      currentMetaDescription = document.createElement('meta')
-
-      currentMetaDescription.setAttribute('name', 'description')
-
-      currentMetaDescription.setAttribute('content', metaDescriptionContent)
-
-      document.head.appendChild(currentMetaDescription)
+      console.log('Google Analytics not initialized')
     }
   }
 
